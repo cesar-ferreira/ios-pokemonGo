@@ -14,6 +14,8 @@ class ViewController: UIViewController, MKMapViewDelegate, CLLocationManagerDele
     @IBOutlet weak var map: MKMapView!
     var managerLocation = CLLocationManager()
     var count = 0
+    var coreDataPokemon: CoreDataPokemon!
+    var pokemons: [Pokemon] = []
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -24,7 +26,75 @@ class ViewController: UIViewController, MKMapViewDelegate, CLLocationManagerDele
         managerLocation.requestWhenInUseAuthorization()
         managerLocation.startUpdatingLocation()
         
+        self.coreDataPokemon = CoreDataPokemon()
+        self.pokemons = self.coreDataPokemon.getAllPokemons()
+        
         showPokemon()
+    }
+    
+    func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+        
+        let anotationView = MKAnnotationView(annotation: annotation, reuseIdentifier: nil)
+                
+        if (annotation is MKUserLocation) {
+            anotationView.image = UIImage(named: "player")
+        } else {
+            let pokemon = (annotation as! PokemonAnotation).pokemon
+            anotationView.image = UIImage(named: pokemon.nameImage!)
+        }
+        
+        var frame = anotationView.frame
+        frame.size.height = 40
+        frame.size.width = 40
+        anotationView.frame = frame
+        
+        return anotationView
+    }
+    
+    func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+        
+        let annotation = view.annotation
+        let pokemon = (view.annotation as! PokemonAnotation).pokemon
+        
+        mapView.deselectAnnotation(annotation, animated: true)
+        
+        if ( annotation is MKUserLocation ) {
+            return
+        }
+        
+        if let coordAnnotation = annotation?.coordinate {
+            let region = MKCoordinateRegion(center: coordAnnotation, latitudinalMeters: 200, longitudinalMeters: 200)
+            
+            map.setRegion(region, animated: true)
+        }
+        
+        self.coreDataPokemon.savePokemon(pokemon: pokemon)
+        self.map.removeAnnotation(annotation!)
+        
+        let alertController = UIAlertController(title: "Parabéns!!!", message: "Você capturou o pokemon " + pokemon.name!, preferredStyle: .alert)
+        let actionOk = UIAlertAction(title: "Ok", style: .default, handler: nil)
+        alertController.addAction(actionOk)
+        
+        self.present(alertController, animated: true, completion: nil)
+        /*
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: false) { (timer) in
+            if let coord = self.managerLocation.location?.coordinate {
+                
+
+                if MKMapRect.init().contains( MKMapPoint.init(coord) ) {
+                    print("Capturado")
+                    self.coreDataPokemon.savePokemon(pokemon: pokemon)
+
+                } else {
+                    print("Não Capturado")
+                    self.coreDataPokemon.savePokemon(pokemon: pokemon)
+
+                }
+              
+
+            }
+        }
+        */
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
@@ -70,8 +140,11 @@ class ViewController: UIViewController, MKMapViewDelegate, CLLocationManagerDele
         Timer.scheduledTimer(withTimeInterval: 8, repeats: true) { (timer) in
              
             if let coordenate = self.managerLocation.location?.coordinate {
-                let anotation = MKPointAnnotation()
                 
+                let anotation = PokemonAnotation(
+                    coordinates: coordenate,
+                    pokemon: self.generateRandomPokemons())
+
                 let randomLat = ( Double( arc4random_uniform(400) ) - 200 ) / 100000.0
                 let randomLon = ( Double( arc4random_uniform(400) ) - 200 ) / 100000.0
 
@@ -80,8 +153,17 @@ class ViewController: UIViewController, MKMapViewDelegate, CLLocationManagerDele
                 anotation.coordinate.longitude += randomLon
                 
                 self.map.addAnnotation( anotation )
+ 
             }
         }
+    }
+    
+    private func generateRandomPokemons() -> Pokemon {
+        
+        let indexRandom = arc4random_uniform( UInt32( self.pokemons.count ) )
+        let pokemon = self.pokemons[ Int(indexRandom) ]
+        
+        return pokemon
     }
     
     private func centralizePlayer() {
@@ -89,21 +171,6 @@ class ViewController: UIViewController, MKMapViewDelegate, CLLocationManagerDele
             let region = MKCoordinateRegion(center: coordenate, latitudinalMeters: 200, longitudinalMeters: 200)
             
             map.setRegion(region, animated: true)
-            
-            /*
-            let userLocation: CLLocation = locations.last!
-            
-            let latitude: CLLocationDegrees = (userLocation.coordinate.latitude)
-            let longitude: CLLocationDegrees = (userLocation.coordinate.longitude)
-            
-            let deltaLat: CLLocationDegrees = 0.01
-            let deltaLog: CLLocationDegrees = 0.01
-            
-            let location: CLLocationCoordinate2D = CLLocationCoordinate2DMake(latitude, longitude)
-            let area: MKCoordinateSpan = MKCoordinateSpan.init(latitudeDelta: deltaLat, longitudeDelta: deltaLog)
-            let region: MKCoordinateRegion = MKCoordinateRegion.init(center: location, span: area)
-            map.setRegion(region, animated: true)
-            */
         }
     }
 
